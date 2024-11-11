@@ -116,7 +116,7 @@ export function Terminal() {
       const data = await response.json()
   
       if (response.ok) {
-        setCurrentDirectory(data.output.trim())
+        setCurrentDirectory(data.execution_result.trim())
       } else {
         console.error('Error fetching current directory:', data.error)
       }
@@ -124,6 +124,13 @@ export function Terminal() {
       console.error('Error fetching current directory:', error)
     }
   }
+
+  // Agregar este estado al inicio del componente Terminal
+  const [lexicalTokens, setLexicalTokens] = useState<Array<{
+    numero: number;
+    valor: string;
+    tipo: string;
+  }>>([]);
 
   const addCommand = async (tabId: string, command: string) => {
     const newCommandEntry = { command, output: '', timestamp: new Date().toISOString(), directory: currentDirectory }
@@ -140,7 +147,11 @@ export function Terminal() {
       const data = await response.json()
   
       if (response.ok) {
-        if (data.output === "CLEAR_SCREEN") {
+        const resultOutput = data.execution_result // Cambiado de data.output a data.execution_result
+        // Guardar los tokens del análisis léxico
+        setLexicalTokens(data.lexical_analysis || []);
+        
+        if (resultOutput === "CLEAR_SCREEN") {
           setTabs(prevTabs =>
             prevTabs.map(tab =>
               tab.id === tabId
@@ -149,7 +160,11 @@ export function Terminal() {
             )
           )
         } else {
-          const resultOutput = data.output.split('\n').join('\n')
+          // Asegurarse de que resultOutput sea una cadena antes de usar split
+          const formattedOutput = typeof resultOutput === 'string' 
+            ? resultOutput 
+            : JSON.stringify(resultOutput)
+  
           setTabs(prevTabs =>
             prevTabs.map(tab =>
               tab.id === tabId
@@ -158,12 +173,18 @@ export function Terminal() {
                     content: [
                       ...tab.content,
                       newCommandEntry,
-                      { command: '', output: resultOutput, timestamp: new Date().toISOString(), directory: currentDirectory }
+                      { 
+                        command: '', 
+                        output: formattedOutput, 
+                        timestamp: new Date().toISOString(), 
+                        directory: currentDirectory 
+                      }
                     ],
                   }
                 : tab
             )
           )
+          
           // Actualizar el directorio actual si el comando es 'cd'
           if (command.startsWith('cd ')) {
             await fetchCurrentDirectory()
@@ -178,7 +199,12 @@ export function Terminal() {
                   content: [
                     ...tab.content,
                     newCommandEntry,
-                    { command: '', output: `Error: ${data.error}`, timestamp: new Date().toISOString(), directory: currentDirectory }
+                    { 
+                      command: '', 
+                      output: `Error: ${data.error}`, 
+                      timestamp: new Date().toISOString(), 
+                      directory: currentDirectory 
+                    }
                   ],
                 }
               : tab
@@ -194,7 +220,12 @@ export function Terminal() {
                 content: [
                   ...tab.content,
                   newCommandEntry,
-                  { command: '', output: `Error: ${(error as Error).message}`, timestamp: new Date().toISOString(), directory: currentDirectory }
+                  { 
+                    command: '', 
+                    output: `Error: ${(error as Error).message}`, 
+                    timestamp: new Date().toISOString(), 
+                    directory: currentDirectory 
+                  }
                 ],
               }
             : tab
@@ -415,53 +446,56 @@ export function Terminal() {
 
       {/* Right Sidebar */}
       <div className="w-80 border-l border-zinc-200 dark:border-zinc-800">
-        <div className="border-b border-zinc-200 p-4 dark:border-zinc-800">
-          <button
-            className="flex w-full items-center justify-between"
-            onClick={() => setPatternsExpanded(!patternsExpanded)}
-          >
-            <div className="flex items-center gap-2">
-              <Layout className="h-4 w-4" />
-              <span className="font-medium">Patrones Lexicos</span>
-            </div>
-            <ChevronDown className={cn("h-4 w-4 transition-transform", patternsExpanded && "rotate-180")} />
-          </button>
-        </div>
-        {patternsExpanded && (
-          <div className="p-4">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-sm text-zinc-500 dark:text-zinc-400">
-                  <th className="pb-2 font-medium">N.</th>
-                  <th className="pb-2 font-medium">Token</th>
-                  <th className="pb-2 font-medium">Tipo</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm">
-                <tr>
-                  <td className="py-1">1</td>
-                  <td className="py-1 text-blue-600 dark:text-blue-400">cat</td>
-                  <td className="py-1">Comando</td>
-                </tr>
-                <tr>
-                  <td className="py-1">2</td>
-                  <td className="py-1">hola</td>
-                  <td className="py-1">Texto</td>
-                </tr>
-                <tr>
-                  <td className="py-1">3</td>
-                  <td className="py-1">.</td>
-                  <td className="py-1">Símbolo</td>
-                </tr>
-                <tr>
-                  <td className="py-1">4</td>
-                  <td className="py-1">txt</td>
-                  <td className="py-1">Texto</td>
-                </tr>
-              </tbody>
-            </table>
+        <div>
+          <div className="border-b border-zinc-200 p-4 dark:border-zinc-800">
+            <button
+              className="flex w-full items-center justify-between"
+              onClick={() => setPatternsExpanded(!patternsExpanded)}
+            >
+              <div className="flex items-center gap-2">
+                <Layout className="h-4 w-4" />
+                <span className="font-medium">Patrones Lexicos</span>
+              </div>
+              <ChevronDown className={cn("h-4 w-4 transition-transform", patternsExpanded && "rotate-180")} />
+            </button>
           </div>
-        )}
+          {patternsExpanded && (
+            <div className="p-4">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-sm text-zinc-500 dark:text-zinc-400">
+                    <th className="pb-2 font-medium">N.</th>
+                    <th className="pb-2 font-medium">Token</th>
+                    <th className="pb-2 font-medium">Tipo</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {lexicalTokens.map((token) => (
+                    <tr key={token.numero}>
+                      <td className="py-1">{token.numero}</td>
+                      <td className={cn(
+                        "py-1",
+                        token.tipo.toLowerCase() === "comando" 
+                          ? "text-blue-600 dark:text-blue-400" 
+                          : "text-blue-600 dark:text-blue-400"
+                      )}>
+                        {token.valor}
+                      </td>
+                      <td className="py-1">{token.tipo}</td>
+                    </tr>
+                  ))}
+                  {lexicalTokens.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="py-4 text-center text-zinc-500">
+                        Ejecute un comando para ver su análisis léxico
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
         <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
           <button
             className="flex w-full items-center justify-between"
