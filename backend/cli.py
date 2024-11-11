@@ -5,6 +5,7 @@ import socket
 import platform
 import re
 from datetime import datetime
+import table_lexico  # Importamos el módulo de análisis léxico
 
 from ply import lex, yacc
 
@@ -546,6 +547,42 @@ def execute_command(parsed_command):
             return result.stdout if result.returncode == 0 else result.stderr
     except Exception as e:
         return str(e)
+
+def process_command(command_string):
+    """
+    Procesa un comando y retorna tanto el análisis léxico como el resultado de la ejecución
+    """
+    try:
+        # Realizar análisis léxico usando table_lexico
+        lexical_analysis = table_lexico.analyze_command(command_string)
+        
+        # Realizar el parsing y ejecución normal del comando
+        parsed_command = parser.parse(command_string)
+        if parsed_command:
+            execution_result = execute_command(parsed_command)
+        else:
+            execution_result = "Error: No se pudo parsear el comando correctamente."
+        
+        # Formatear los tokens para JSON
+        formatted_tokens = [
+            {
+                "numero": idx + 1,
+                "valor": token[0],
+                "tipo": token[1]
+            }
+            for idx, token in enumerate(lexical_analysis)
+        ]
+        
+        return {
+            "lexical_analysis": formatted_tokens,
+            "execution_result": execution_result
+        }
+        
+    except Exception as e:
+        return {
+            "lexical_analysis": [],
+            "execution_result": f"Error: {str(e)}"
+        }
 
 # Ejemplo de uso
 if __name__ == "__main__":
