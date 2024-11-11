@@ -1,6 +1,7 @@
-"use client"
+'use client'
 
-import * as React from "react"
+// import * as React from "react";
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   Github, 
   Home, 
@@ -18,6 +19,7 @@ import {
   Timer
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { commands as initialCommands, Command } from './commands'
 
 type Command = {
   id: string
@@ -45,6 +47,11 @@ type Suggestion = {
   type: "command" | "directory"
 }
 
+type OutputLine = {
+  type: 'command' | 'result',
+  text: string
+}
+
 export function Terminal() {
   const [activeTab, setActiveTab] = React.useState("pruebas")
   const [windowsExpanded, setWindowsExpanded] = React.useState(true)
@@ -55,7 +62,11 @@ export function Terminal() {
   const [isDarkMode, setIsDarkMode] = React.useState(false)
   const [commandInput, setCommandInput] = React.useState("")
   const [showSuggestions, setShowSuggestions] = React.useState(false)
-  
+  const [output, setOutput] = React.useState<OutputLine[]>([
+    { type: 'result', text: 'Bienvenido a LinuxCLI v1.0.0' },
+    { type: 'result', text: 'Escribe "help" para ver la lista de comandos.' },
+  ])
+
   const suggestions: Suggestion[] = [
     { id: "mkdir", icon: FolderTree, label: "mkdir", type: "command" },
     { id: "mkfs", icon: FileCode, label: "mkfs", type: "command" },
@@ -63,62 +74,10 @@ export function Terminal() {
     { id: "mkdado", icon: FolderTree, label: "mkdado", type: "directory" },
   ]
 
-  const [commands, setCommands] = React.useState<Command[]>([
-    {
-      id: "cd",
-      description: "Cambia el directorio actual.",
-      example: "cd Documents",
-      isExpanded: false,
-      popupExpanded: false
-    },
-    {
-      id: "ping",
-      description: "Envía paquetes ICMP a un host específico.",
-      example: "ping google.com",
-      isExpanded: false,
-      popupExpanded: false
-    },
-    {
-      id: "mkdir",
-      description: "Crea un nuevo directorio.",
-      example: "mkdir nuevo_directorio",
-      isExpanded: false,
-      popupExpanded: false
-    },
-    {
-      id: "ls",
-      description: "Lista el contenido del directorio actual.",
-      example: "ls -la",
-      isExpanded: false,
-      popupExpanded: false
-    },
-    {
-      id: "mv",
-      description: "Mueve o renombra archivos y directorios.",
-      example: "mv archivo.txt nuevo_nombre.txt",
-      isExpanded: false,
-      popupExpanded: false
-    },
-    {
-      id: "echo",
-      description: "Muestra un mensaje en la terminal.",
-      example: "echo 'Hola Mundo'",
-      isExpanded: false,
-      popupExpanded: false
-    },
-    {
-      id: "history",
-      description: "Muestra el historial de comandos.",
-      example: "history",
-      isExpanded: false,
-      popupExpanded: false
-    }
-  ])
+  const [commands, setCommands] = React.useState<Command[]>(initialCommands)
   
   const [tabs, setTabs] = React.useState<Tab[]>([
     { id: "pruebas", content: [] },
-    { id: "data", content: [] },
-    { id: "game", content: [] },
   ])
 
   const filteredSuggestions = React.useMemo(() => {
@@ -142,20 +101,108 @@ export function Terminal() {
     )
   }
 
-  const addCommand = (tabId: string, command: string) => {
-    setTabs(prevTabs =>
-      prevTabs.map(tab =>
-        tab.id === tabId
-          ? {
-              ...tab,
-              content: [
-                ...tab.content,
-                { command, output: `Output for: ${command}`, timestamp: new Date().toISOString() },
-              ],
-            }
-          : tab
+  const [currentDirectory, setCurrentDirectory] = React.useState("")
+
+  const fetchCurrentDirectory = async () => {
+    try {
+      const response = await fetch('/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ command: 'pwd' }),
+      })
+  
+      const data = await response.json()
+  
+      if (response.ok) {
+        setCurrentDirectory(data.output.trim())
+      } else {
+        console.error('Error fetching current directory:', data.error)
+      }
+    } catch (error) {
+      console.error('Error fetching current directory:', error)
+    }
+  }
+
+  const addCommand = async (tabId: string, command: string) => {
+    const newCommandEntry = { command, output: '', timestamp: new Date().toISOString(), directory: currentDirectory }
+  
+    try {
+      const response = await fetch('/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ command }),
+      })
+  
+      const data = await response.json()
+  
+      if (response.ok) {
+        if (data.output === "CLEAR_SCREEN") {
+          setTabs(prevTabs =>
+            prevTabs.map(tab =>
+              tab.id === tabId
+                ? { ...tab, content: [] }
+                : tab
+            )
+          )
+        } else {
+          const resultOutput = data.output.split('\n').join('\n')
+          setTabs(prevTabs =>
+            prevTabs.map(tab =>
+              tab.id === tabId
+                ? {
+                    ...tab,
+                    content: [
+                      ...tab.content,
+                      newCommandEntry,
+                      { command: '', output: resultOutput, timestamp: new Date().toISOString(), directory: currentDirectory }
+                    ],
+                  }
+                : tab
+            )
+          )
+          // Actualizar el directorio actual si el comando es 'cd'
+          if (command.startsWith('cd ')) {
+            await fetchCurrentDirectory()
+          }
+        }
+      } else {
+        setTabs(prevTabs =>
+          prevTabs.map(tab =>
+            tab.id === tabId
+              ? {
+                  ...tab,
+                  content: [
+                    ...tab.content,
+                    newCommandEntry,
+                    { command: '', output: `Error: ${data.error}`, timestamp: new Date().toISOString(), directory: currentDirectory }
+                  ],
+                }
+              : tab
+          )
+        )
+      }
+    } catch (error) {
+      setTabs(prevTabs =>
+        prevTabs.map(tab =>
+          tab.id === tabId
+            ? {
+                ...tab,
+                content: [
+                  ...tab.content,
+                  newCommandEntry,
+                  { command: '', output: `Error: ${(error as Error).message}`, timestamp: new Date().toISOString(), directory: currentDirectory }
+                ],
+              }
+            : tab
+        )
       )
-    )
+    }
+  
+    setCommandInput('')
   }
 
   const closeTab = (tabId: string) => {
@@ -174,10 +221,30 @@ export function Terminal() {
     setActiveTab(newTabId)
   }
 
+  const terminalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [tabs, activeTab]);
+
   const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode)
-    document.documentElement.classList.toggle('dark')
+    const newMode = !isDarkMode
+    setIsDarkMode(newMode)
+    document.documentElement.classList.toggle('dark', newMode)
+    localStorage.setItem('isDarkMode', JSON.stringify(newMode))
   }
+  
+  React.useEffect(() => {
+    fetchCurrentDirectory()
+    const savedMode = localStorage.getItem('isDarkMode')
+    if (savedMode !== null) {
+      const isDark = JSON.parse(savedMode)
+      setIsDarkMode(isDark)
+      document.documentElement.classList.toggle('dark', isDark)
+    }
+  }, [])
 
   return (
     <div className="flex min-h-screen bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 font-sans">
@@ -186,7 +253,7 @@ export function Terminal() {
         <div className="p-4">
           <a
             href="https://github.com/yourusername/linux-cli"
-            className="group flex items-center gap-2 rounded-full bg-lime-100 px-4 py-2 dark:bg-lime-900"
+            className="group flex items-center gap-2 rounded-full bg-lime-100 px-4 py-4 dark:bg-lime-900"
           >
             <Github className="h-5 w-5 text-black dark:text-white" />
             <span className="font-mono font-bold text-black dark:text-white">Linux CLI</span>
@@ -282,23 +349,25 @@ export function Terminal() {
             </button>
           </div>
         </div>
-        <div className="p-4">
+        <div className="p-4" style={{ height: 'calc(100vh - 120px)', overflowY: 'auto' }} ref={terminalRef}>
           <div className="font-mono space-y-4">
             {tabs.find(tab => tab.id === activeTab)?.content.map((entry, i) => (
               <div key={i} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-red-600 dark:text-red-400">User ></span>
-                  <span className="text-blue-600 dark:text-blue-400">{entry.command}</span>
-                </div>
+                {entry.command && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-600 dark:text-red-400">{entry.directory} ></span>
+                    <span className="text-blue-600 dark:text-blue-400">{entry.command}</span>
+                  </div>
+                )}
                 {entry.output && (
-                  <div className="rounded-lg bg-zinc-100 p-3 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                  <div className="rounded-lg bg-zinc-100 p-3 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 whitespace-pre-wrap">
                     {entry.output}
                   </div>
                 )}
               </div>
             ))}
             <div className="relative flex items-center gap-2">
-              <span className="text-red-600 dark:text-red-400">User ></span>
+              <span className="text-red-600 dark:text-red-400">{currentDirectory} ></span>
               <input
                 type="text"
                 value={commandInput}
@@ -353,7 +422,7 @@ export function Terminal() {
           >
             <div className="flex items-center gap-2">
               <Layout className="h-4 w-4" />
-              <span className="font-medium">Patrones</span>
+              <span className="font-medium">Patrones Lexicos</span>
             </div>
             <ChevronDown className={cn("h-4 w-4 transition-transform", patternsExpanded && "rotate-180")} />
           </button>
@@ -365,7 +434,7 @@ export function Terminal() {
                 <tr className="text-left text-sm text-zinc-500 dark:text-zinc-400">
                   <th className="pb-2 font-medium">N.</th>
                   <th className="pb-2 font-medium">Token</th>
-                  <th className="pb-2 font-medium">Descripción</th>
+                  <th className="pb-2 font-medium">Tipo</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
@@ -405,7 +474,7 @@ export function Terminal() {
             <ChevronDown className={cn("h-4 w-4 transition-transform", commandsExpanded && "rotate-180")} />
           </button>
           {commandsExpanded && (
-            <div className="mt-2 space-y-1">
+            <div className="mt-2 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
               {commands.map((cmd) => (
                 <div key={cmd.id} className="rounded-lg">
                   <button
@@ -416,10 +485,6 @@ export function Terminal() {
                     onClick={() => toggleCommandExpanded(cmd.id)}
                   >
                     <div className="flex items-center gap-2">
-                      <ChevronRight className={cn(
-                        "h-4 w-4 transition-transform",
-                        cmd.isExpanded && "rotate-90"
-                      )} />
                       {cmd.id}
                     </div>
                     <ChevronDown className={cn(
@@ -465,10 +530,6 @@ export function Terminal() {
                       onClick={() => toggleCommandExpanded(cmd.id, true)}
                     >
                       <div className="flex items-center gap-2">
-                        <ChevronRight className={cn(
-                          "h-4 w-4 transition-transform",
-                          cmd.popupExpanded && "rotate-90"
-                        )} />
                         {cmd.id}
                       </div>
                       <ChevronDown className={cn(
