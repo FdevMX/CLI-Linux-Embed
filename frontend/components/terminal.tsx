@@ -508,28 +508,45 @@ export function Terminal() {
             <ChevronDown className={cn("h-4 w-4 transition-transform", commandsExpanded && "rotate-180")} />
           </button>
           {commandsExpanded && (
-            <div className="mt-2 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+            <div className="mt-4 space-y-2 overflow-y-auto px-2" style={{ maxHeight: 'calc(100vh - 300px)' }}>
               {commands.map((cmd) => (
-                <div key={cmd.id} className="rounded-lg">
+                <div 
+                  key={cmd.id} 
+                  className="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden"
+                >
                   <button
                     className={cn(
-                      "flex w-full items-center justify-between rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800",
-                      cmd.isExpanded && "bg-zinc-100 dark:bg-zinc-800"
+                      "w-full transition-colors duration-200",
+                      "flex items-center justify-between",
+                      "px-4 py-3",
+                      "hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+                      cmd.isExpanded && "bg-zinc-50 dark:bg-zinc-800/50"
                     )}
                     onClick={() => toggleCommandExpanded(cmd.id)}
                   >
                     <div className="flex items-center gap-2">
-                      {cmd.id}
+                      <TerminalIcon className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+                      <span className="font-medium">{cmd.id}</span>
                     </div>
-                    <ChevronDown className={cn(
-                      "h-4 w-4 transition-transform",
-                      cmd.isExpanded && "rotate-180"
-                    )} />
+                    <ChevronDown 
+                      className={cn(
+                        "h-4 w-4 text-zinc-500 dark:text-zinc-400",
+                        "transition-transform duration-200",
+                        cmd.isExpanded && "rotate-180"
+                      )} 
+                    />
                   </button>
+                  
                   {cmd.isExpanded && (
-                    <div className="px-9 py-2 text-sm text-zinc-600 dark:text-zinc-400">
-                      <p>{cmd.description}</p>
-                      <p className="mt-1">Ejemplo: {cmd.example}</p>
+                    <div className="border-t border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-3">
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                        {cmd.description}
+                      </p>
+                      <div className="mt-2 rounded bg-zinc-50 dark:bg-zinc-800/50 p-2">
+                        <p className="text-sm font-mono text-zinc-600 dark:text-zinc-400">
+                          Ejemplo: {cmd.example}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
