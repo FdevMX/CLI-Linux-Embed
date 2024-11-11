@@ -1,0 +1,76 @@
+Created by PLY version 3.11 (http://www.dabeaz.com/ply)
+
+Grammar
+
+Rule 0     S' -> command
+Rule 1     command -> COMMAND
+Rule 2     command -> COMMAND ARGUMENTS
+Rule 3     ARGUMENTS -> ARGUMENT
+Rule 4     ARGUMENTS -> ARGUMENT ARGUMENTS
+
+Terminals, with rules where they appear
+
+ARGUMENT             : 3 4
+COMMAND              : 1 2
+error                : 
+
+Nonterminals, with rules where they appear
+
+ARGUMENTS            : 2 4
+command              : 0
+
+Parsing method: LALR
+
+state 0
+
+    (0) S' -> . command
+    (1) command -> . COMMAND
+    (2) command -> . COMMAND ARGUMENTS
+
+    COMMAND         shift and go to state 2
+
+    command                        shift and go to state 1
+
+state 1
+
+    (0) S' -> command .
+
+
+
+state 2
+
+    (1) command -> COMMAND .
+    (2) command -> COMMAND . ARGUMENTS
+    (3) ARGUMENTS -> . ARGUMENT
+    (4) ARGUMENTS -> . ARGUMENT ARGUMENTS
+
+    $end            reduce using rule 1 (command -> COMMAND .)
+    ARGUMENT        shift and go to state 4
+
+    ARGUMENTS                      shift and go to state 3
+
+state 3
+
+    (2) command -> COMMAND ARGUMENTS .
+
+    $end            reduce using rule 2 (command -> COMMAND ARGUMENTS .)
+
+
+state 4
+
+    (3) ARGUMENTS -> ARGUMENT .
+    (4) ARGUMENTS -> ARGUMENT . ARGUMENTS
+    (3) ARGUMENTS -> . ARGUMENT
+    (4) ARGUMENTS -> . ARGUMENT ARGUMENTS
+
+    $end            reduce using rule 3 (ARGUMENTS -> ARGUMENT .)
+    ARGUMENT        shift and go to state 4
+
+    ARGUMENTS                      shift and go to state 5
+
+state 5
+
+    (4) ARGUMENTS -> ARGUMENT ARGUMENTS .
+
+    $end            reduce using rule 4 (ARGUMENTS -> ARGUMENT ARGUMENTS .)
+
