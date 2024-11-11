@@ -6,9 +6,9 @@ import platform
 import re
 from datetime import datetime
 
-# Lexer for command
 from ply import lex, yacc
- parsing
+
+# Lexer for command parsing
 tokens = (
     'COMMAND',
     'ARGUMENT'
