@@ -7,12 +7,6 @@ CORS(app)  # Permite CORS para todas las rutas
 
 @app.route('/execute', methods=['POST'])
 def execute():
-    """
-    Flask route to execute a command sent via POST request.
-
-    Returns:
-    - JSON response containing the command output.
-    """
     data = request.get_json()
     command = data.get('command', '')
     
